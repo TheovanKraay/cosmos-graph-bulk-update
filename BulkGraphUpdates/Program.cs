@@ -98,10 +98,10 @@ namespace BulkGraphUpdates
         internal string label { get; set; }
 
         [JsonProperty("model")]
-        public List<DeviceModel> model { get; set; }
+        public List<VertexProperty> model { get; set; }
 
         [JsonProperty("status")]
-        public List<DeviceStatus> status { get; set; }
+        public List<VertexProperty> status { get; set; }
 
         [JsonProperty("_rid")]
         internal string _rid { get; set; }
@@ -119,17 +119,7 @@ namespace BulkGraphUpdates
         internal string _ts { get; set; }
 
     }
-    public class DeviceModel
-    {
-        [JsonProperty("id")]
-        internal string Id { get; set; }
-
-        [JsonProperty("_value")]
-        internal string _value { get; set; }
-
-    }
-
-    public class DeviceStatus
+    public class VertexProperty
     {
         [JsonProperty("id")]
         internal string Id { get; set; }
