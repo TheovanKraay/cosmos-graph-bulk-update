@@ -1,9 +1,7 @@
-﻿using System;
-
-namespace BulkGraphUpdates
+﻿namespace BulkGraphUpdates
 {
+    using System;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Threading.Tasks;
     using Microsoft.Azure.Cosmos;
     using Newtonsoft.Json;
@@ -35,53 +33,39 @@ namespace BulkGraphUpdates
         private static async Task BulkUpdateGraphAsync()
         {
             Container container = client.GetContainer("graphdb", "graph");
-            try
-            {
 
-                //get vertices where property called "model" = 'typeR'
-                QueryDefinition query = new QueryDefinition("SELECT * FROM c where c.model[0]._value = 'typeR'");
+            //get vertices where property called "model" = 'typeR'
+            QueryDefinition query = new QueryDefinition("SELECT * FROM c where c.model[0]._value = 'typeR'");
 
-                List<VertexDevice> persons = new List<VertexDevice>();
-                using (FeedIterator<VertexDevice> resultSet = container.GetItemQueryIterator<VertexDevice>(
-                    queryDefinition: query,
-                    requestOptions: new QueryRequestOptions()
-                    {
-                        //these devices have been modelled with partition key value of "fleet1"
-                        PartitionKey = new PartitionKey("fleet1"),
-                    }))
+            List<VertexDevice> persons = new List<VertexDevice>();
+            using (FeedIterator<VertexDevice> resultSet = container.GetItemQueryIterator<VertexDevice>(
+                queryDefinition: query,
+                requestOptions: new QueryRequestOptions()
                 {
-                    while (resultSet.HasMoreResults)
-                    {
-                        try
-                        {
-                            FeedResponse<VertexDevice> response = await resultSet.ReadNextAsync();
-                            VertexDevice person = response.First();
-                            persons.AddRange(response);
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine("Exception: " + e);
-                        }
-                    }
-
-                    //set up concurrentTasks for bulk upsert
-                    List<Task> concurrentTasks = new List<Task>();
-                    foreach (VertexDevice device in persons)
-                    {
-                        //change property "name" to be a different value in each node
-                        device.status[0]._value = "on";
-                        //devices have been modelled with partition key value of "fleet1"
-                        concurrentTasks.Add(container.UpsertItemAsync(device, new PartitionKey("fleet1")));
-                    }
-
-                    //bulk update the graph objects in fleet1, changing status of all "typeR" models to "on"
-                    await Task.WhenAll(concurrentTasks);
-                }                
-            }
-            catch (Exception e)
+                    //these devices have been modelled with partition key value of "fleet1"
+                    PartitionKey = new PartitionKey("fleet1"),
+                }))
             {
-                Console.WriteLine("Exception: " + e);
+                while (resultSet.HasMoreResults)
+                {
+                    FeedResponse<VertexDevice> response = await resultSet.ReadNextAsync();
+                    persons.AddRange(response);
+                }
+
+                //set up concurrentTasks for bulk upsert
+                List<Task> concurrentTasks = new List<Task>();
+                foreach (VertexDevice device in persons)
+                {
+                    //change property "status" to be a different value in each node
+                    device.status[0]._value = "on";
+                    //devices have been modelled with partition key value of "fleet1"
+                    concurrentTasks.Add(container.UpsertItemAsync(device, new PartitionKey("fleet1")));
+                }
+
+                //bulk update the graph objects in fleet1, changing status of all "typeR" models to "on"
+                await Task.WhenAll(concurrentTasks);
             }
+
         }
     }
 
