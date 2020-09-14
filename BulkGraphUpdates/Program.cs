@@ -18,6 +18,7 @@
         static CosmosClient client = new CosmosClient(endpoint, authKey, new CosmosClientOptions() { AllowBulkExecution = true });       
 
         List<String> faileddocs = new List<String>();
+        List<VertexDevice> vertices;
         static async Task Main(string[] args)
         {
             try
@@ -35,17 +36,20 @@
 
         private async Task BulkUpdateGraphAsync()
         {            
-            List<VertexDevice> vertices;
+            
             //if we get failed docs, it means the optimistic concurrency control test failed due to another process updating the doc at the same time, and 
             //we want to check get the temperature to ensure we are increasing all device temperatures by the same amount
             if (this.faileddocs.Count != 0)
             {
-                vertices = new List<VertexDevice>();
+                List<Task> concurrentTasks = new List<Task>();
+                this.vertices = new List<VertexDevice>();
                 foreach (String docid in this.faileddocs)
                 {
-                    ItemResponse<VertexDevice> response = await container.ReadItemAsync<VertexDevice>(partitionKey: new PartitionKey("fleet1"), id: docid);
-                    vertices.Add(response);                
+                    //add tasks to concurrent tasks list
+                    concurrentTasks.Add(Read(docid));               
                 }
+                //bulk read each failed doc, adding each to vertices to be processed.
+                await Task.WhenAll(concurrentTasks);
             }
 
             else
@@ -94,7 +98,6 @@
                 //bulk update the graph objects in fleet1, increasing temperature of all devices by 20. 
                 await Task.WhenAll(concurrentTasks);
 
-
                 if (this.faileddocs.Count != 0)
                 {
                     //recursive method call to re-apply change where replaceItem failed IfMatchEtag  
@@ -119,6 +122,12 @@
                     this.faileddocs.Add(device.Id);
                 }                
             }
+        }
+
+        private async Task Read(string docid)
+        {
+            ItemResponse<VertexDevice> response = await container.ReadItemAsync<VertexDevice>(partitionKey: new PartitionKey("fleet1"), id: docid);
+            vertices.Add(response);
         }
     }
 
