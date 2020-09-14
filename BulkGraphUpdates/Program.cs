@@ -44,8 +44,6 @@
                 foreach (String docid in this.faileddocs)
                 {
                     ItemResponse<VertexDevice> response = await container.ReadItemAsync<VertexDevice>(partitionKey: new PartitionKey("fleet1"), id: docid);
-
-                    Console.WriteLine("response.Resource.temp[0]._value: " + response.Resource.temp[0]._value);
                     vertices.Add(response);                
                 }
             }
