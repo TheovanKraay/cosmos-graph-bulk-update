@@ -13,8 +13,8 @@
         static string endpoint = ".NET SDK URI";
         static string authKey = "PRIMARY KEY";
         Container container = client.GetContainer("graphdb", "graph");
-        //create cosmos client with bulk support enabled
 
+        //create cosmos client with bulk support enabled
         static CosmosClient client = new CosmosClient(endpoint, authKey, new CosmosClientOptions() { AllowBulkExecution = true });       
 
         List<String> faileddocs = new List<String>();
