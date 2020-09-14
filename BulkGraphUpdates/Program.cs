@@ -14,6 +14,17 @@
         static string authKey = "PRIMARY KEY";
         Container container = client.GetContainer("graphdb", "graph");
         //create cosmos client with bulk support enabled
+
+        CosmosClientOptions clientOptions = new CosmosClientOptions()
+        {
+            SerializerOptions = new CosmosSerializationOptions()
+            {
+                IgnoreNullValues = true
+            },
+            ConnectionMode = ConnectionMode.Gateway,
+            WebProxy = new System.Net.WebProxy() { BypassProxyOnLocal = true }
+        };
+
         static CosmosClient client = new CosmosClient(endpoint, authKey, new CosmosClientOptions() { AllowBulkExecution = true });
 
         List<String> faileddocs = new List<String>();
@@ -34,23 +45,27 @@
 
         private async Task BulkUpdateGraphAsync()
         {            
-            List<VertexDevice> persons;
+            List<VertexDevice> vertices;
+            //if we get failed docs, it means the optimistic concurrency control test failed due to another process updating the doc at the same time, and 
+            //we want to check get the temperature to ensure we are increasing all device temperatures by the same amount
             if (this.faileddocs.Count != 0)
             {
-                persons = new List<VertexDevice>();
+                vertices = new List<VertexDevice>();
                 foreach (String docid in this.faileddocs)
                 {
                     ItemResponse<VertexDevice> response = await container.ReadItemAsync<VertexDevice>(partitionKey: new PartitionKey("fleet1"), id: docid);
-                    persons.Add(response);
+
+                    Console.WriteLine("response.Resource.temp[0]._value: " + response.Resource.temp[0]._value);
+                    vertices.Add(response);                
                 }
             }
 
             else
             {
-                //get vertices where property called "model" = 'typeR'
-                QueryDefinition query = new QueryDefinition("SELECT * FROM c where c.model[0]._value = 'typeR'");
+                //get vertices where temperature = 100 as we want to increase all of them by 20
+                QueryDefinition query = new QueryDefinition("SELECT * FROM c where c.pk = 'fleet1'");
 
-                persons = new List<VertexDevice>();
+                vertices = new List<VertexDevice>();
                 using (FeedIterator<VertexDevice> resultSet = container.GetItemQueryIterator<VertexDevice>(
                     queryDefinition: query,
                     requestOptions: new QueryRequestOptions()
@@ -61,7 +76,7 @@
                     while (resultSet.HasMoreResults)
                     {
                         FeedResponse<VertexDevice> response = await resultSet.ReadNextAsync();
-                        persons.AddRange(response);
+                        vertices.AddRange(response);
                     }
             }
 
@@ -69,22 +84,26 @@
             faileddocs = new List<String>();
 
             //test optimistic concurrency by updating a doc within a 30 second window to force IfMatchEtag to fail
-            Console.WriteLine("waiting......");
+            Console.WriteLine("waiting 30 seconds to simulate concurrent updates before applying bulk update......");
             Thread.Sleep(30000);
 
             {
                 //set up concurrentTasks for bulk upsert
                 List<Task> concurrentTasks = new List<Task>();
-                foreach (VertexDevice device in persons)
+                foreach (VertexDevice device in vertices)
                 {
-                    //change property "status" to be a different value in each node
-                    device.status[0]._value = "on";
+                    //increase temperature setting by 20
+                    device.temp[0]._value = device.temp[0]._value + 20;
 
-                    //add tasks to concurrent tasks list
-                    concurrentTasks.Add(Update(device));
+                    //we put a safeguard here to ensure no updates that take temp above 140
+                    if (device.temp[0]._value < 140)
+                    {
+                        //add tasks to concurrent tasks list
+                        concurrentTasks.Add(Update(device));
+                    }
 
                 }
-                //bulk update the graph objects in fleet1, changing status of all "typeR" models to "on"
+                //bulk update the graph objects in fleet1, increasing temperature of all devices by 20. 
                 await Task.WhenAll(concurrentTasks);
 
 
@@ -92,7 +111,7 @@
                 {
                     //recursive method call to re-apply change where replaceItem failed IfMatchEtag  
                     Console.WriteLine("Retrying docs where IfMatchEtag failed...");
-                    await new Program().BulkUpdateGraphAsync();
+                    await BulkUpdateGraphAsync();
                 }
             }
 
@@ -130,6 +149,9 @@
         [JsonProperty("model")]
         public List<VertexProperty> model { get; set; }
 
+        [JsonProperty("temp")]
+        public List<VertexPropertyNumber> temp { get; set; }
+
         [JsonProperty("status")]
         public List<VertexProperty> status { get; set; }
 
@@ -152,10 +174,20 @@
     public class VertexProperty
     {
         [JsonProperty("id")]
-        internal string Id { get; set; }
+        public string Id { get; set; }
 
         [JsonProperty("_value")]
-        internal string _value { get; set; }
+        public string _value { get; set; }
+
+    }
+
+    public class VertexPropertyNumber
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("_value")]
+        public int _value { get; set; }
 
     }
 }
