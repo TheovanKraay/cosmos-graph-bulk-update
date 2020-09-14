@@ -22,7 +22,7 @@
         {
             try
             {
-                //We are going to update all the devices in partition "fleet1", of model "typeR", to have status = "on"
+                //We are going to update all the devices in partition "fleet1", to increase temperature by 20
                 Console.WriteLine("Bulk updating nodes in graph...");
                 await new Program().BulkUpdateGraphAsync();
                 Console.WriteLine("Update done!");
