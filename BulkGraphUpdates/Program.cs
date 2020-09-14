@@ -48,7 +48,7 @@
                     //add tasks to concurrent tasks list
                     concurrentTasks.Add(Read(docid));               
                 }
-                //bulk read each failed doc, adding each to vertices to be processed.
+                //bulk read each failed doc, adding each to vertices to be re-processed.
                 await Task.WhenAll(concurrentTasks);
             }
 
