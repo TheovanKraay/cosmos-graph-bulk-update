@@ -15,17 +15,7 @@
         Container container = client.GetContainer("graphdb", "graph");
         //create cosmos client with bulk support enabled
 
-        CosmosClientOptions clientOptions = new CosmosClientOptions()
-        {
-            SerializerOptions = new CosmosSerializationOptions()
-            {
-                IgnoreNullValues = true
-            },
-            ConnectionMode = ConnectionMode.Gateway,
-            WebProxy = new System.Net.WebProxy() { BypassProxyOnLocal = true }
-        };
-
-        static CosmosClient client = new CosmosClient(endpoint, authKey, new CosmosClientOptions() { AllowBulkExecution = true });
+        static CosmosClient client = new CosmosClient(endpoint, authKey, new CosmosClientOptions() { AllowBulkExecution = true });       
 
         List<String> faileddocs = new List<String>();
         static async Task Main(string[] args)
@@ -62,7 +52,7 @@
 
             else
             {
-                //get vertices where temperature = 100 as we want to increase all of them by 20
+                //get vertices in 'fleet1' as we want to increase all of them by 20
                 QueryDefinition query = new QueryDefinition("SELECT * FROM c where c.pk = 'fleet1'");
 
                 vertices = new List<VertexDevice>();
